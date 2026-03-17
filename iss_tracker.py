@@ -4,7 +4,7 @@ import folium
 from streamlit_folium import st_folium
 from datetime import datetime
 import math
-import time
+from streamlit_autorefresh import st_autorefresh
 
 # ----------------------
 # CONFIG PAGINA
@@ -15,18 +15,20 @@ st.set_page_config(
 )
 
 # ----------------------
+# AUTO REFRESH (30s)
+# ----------------------
+st_autorefresh(interval=30000, key="iss_refresh")
+
+# ----------------------
 # STILE DARK NASA
 # ----------------------
 st.markdown("""
     <style>
-    body {
+    .stApp {
         background-color: #0b0f1a;
         color: white;
     }
-    .stApp {
-        background-color: #0b0f1a;
-    }
-    h1, h2, h3, h4 {
+    h1, h2, h3 {
         color: #00e6ff;
     }
     </style>
@@ -49,7 +51,7 @@ def get_iss_position():
     return float(data['iss_position']['latitude']), float(data['iss_position']['longitude'])
 
 # ----------------------
-# CALCOLO DISTANZA
+# DISTANZA (Haversine)
 # ----------------------
 def distanza(lat1, lon1, lat2, lon2):
     R = 6371
@@ -62,7 +64,7 @@ def distanza(lat1, lon1, lat2, lon2):
     return R * c
 
 # ----------------------
-# ITALIA CHECK
+# CHECK ITALIA
 # ----------------------
 def sopra_italia(lat, lon):
     return 36 < lat < 47 and 6 < lon < 19
@@ -77,7 +79,7 @@ if "last_pos" not in st.session_state:
     st.session_state.last_pos = None
 
 # ----------------------
-# DATI
+# DATI ISS
 # ----------------------
 lat, lon = get_iss_position()
 st.session_state.percorso.append([lat, lon])
@@ -129,7 +131,7 @@ if len(st.session_state.percorso) > 1:
         weight=2
     ).add_to(mappa)
 
-st_folium(mappa, width=1200, height=500)
+st_folium(mappa, width=1200, height=500, key="map")
 
 # ----------------------
 # STORICO
@@ -144,9 +146,3 @@ for i, pos in enumerate(st.session_state.percorso[-10:][::-1]):
 # ----------------------
 st.markdown("---")
 st.caption(f"🕒 Ultimo aggiornamento: {datetime.now().strftime('%H:%M:%S')}")
-
-# ----------------------
-# AUTO REFRESH
-# ----------------------
-time.sleep(30)
-st.rerun()
