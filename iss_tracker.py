@@ -11,8 +11,8 @@ import pytz
 # ----------------------
 # CONFIG
 # ----------------------
-st.set_page_config(layout="wide", page_title="NASA ISS Globe Tracker")
-st.title("🛰️ NASA ISS Tracker - Globe 3D")
+st.set_page_config(layout="wide", page_title="NASA ISS Tracker")
+st.title("🛰️ NASA ISS Tracker - Mappa Satellitare")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -20,7 +20,7 @@ st_autorefresh(interval=10000, key="refresh")
 URL = "http://api.open-notify.org/iss-now.json"
 
 # ----------------------
-# TOGGLE LIGHT/DARK
+# LIGHT/DARK TOGGLE
 # ----------------------
 if "light_mode" not in st.session_state:
     st.session_state.light_mode = False
@@ -145,7 +145,7 @@ st.session_state.last = (lat, lon)
 st.session_state.bearing += 3  # aumenta 3 gradi ogni refresh
 
 # ----------------------
-# LAYER ISS
+# LAYER ISS (pallino arancione)
 # ----------------------
 iss_layer = pdk.Layer(
     "ScatterplotLayer",
@@ -169,7 +169,7 @@ path_layer = pdk.Layer(
 )
 
 # ----------------------
-# MAPPA SATELLITE 3D
+# MAPPA SATELLITE 3D (simulazione globo)
 # ----------------------
 view_state = pdk.ViewState(
     latitude=lat,
@@ -200,7 +200,7 @@ col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
 col5.metric("Aggiornamento", datetime.now().strftime("%H:%M:%S"))
 
 # ----------------------
-# CITTÀ SORVOLATA E ORARIO LOCALE (caching)
+# CITTÀ SORVOLATA E ORARIO LOCALE
 # ----------------------
 st.subheader("🏙️ Città sorvolata")
 city, tz_name, local_time = get_city_and_time_cached(lat, lon)
