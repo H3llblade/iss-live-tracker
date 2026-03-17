@@ -149,13 +149,19 @@ st.pydeck_chart(deck)
 # ----------------------
 # TELEMETRIA IN BOX
 # ----------------------
+import pytz
+
 st.subheader("📡 Telemetria ISS")
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Latitudine", f"{lat:.4f}°")
 col2.metric("Longitudine", f"{lon:.4f}°")
 col3.metric("Velocità", f"{speed:.0f} km/h")
 col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
-col5.metric("Aggiornamento", datetime.now().strftime("%H:%M:%S"))
+
+# Orario aggiornamento in Europa (CET/CEST)
+eu_tz = pytz.timezone("Europe/Rome")
+eu_time = datetime.now(eu_tz).strftime("%H:%M:%S")
+col5.metric("Aggiornamento (Europa)", eu_time)
 
 # ----------------------
 # FUNZIONE PER STATO/REGIONE E ORARIO LOCALE
