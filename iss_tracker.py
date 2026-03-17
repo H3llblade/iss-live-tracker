@@ -161,7 +161,7 @@ col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
 # Orario aggiornamento in Europa (CET/CEST)
 eu_tz = pytz.timezone("Europe/Rome")
 eu_time = datetime.now(eu_tz).strftime("%H:%M:%S")
-col5.metric("Aggiornamento (Europa)", eu_time)
+col5.metric("Ultimo Aggiornamento (Europa)", eu_time)
 
 # ----------------------
 # FUNZIONE PER STATO/REGIONE E ORARIO LOCALE
