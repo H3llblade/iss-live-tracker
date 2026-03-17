@@ -9,7 +9,7 @@ from datetime import datetime
 # CONFIG
 # ----------------------
 st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
-st.title("🛰️ NASA ISS MISSION CONTROL - Versione Avanzata")
+st.title("🛰️ NASA ISS MISSION CONTROL")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -26,14 +26,14 @@ def get_iss():
         lon = float(data['iss_position']['longitude'])
         return lat, lon
     except:
-        return 0, 0
+        return None, None
 
 def distanza(lat1, lon1, lat2, lon2):
-    R = 6371  # raggio Terra km
+    R = 6371
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlon/2)**2
+    c = 2*math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
 
 # ----------------------
@@ -49,12 +49,14 @@ if "altitude" not in st.session_state:
     st.session_state.altitude = 420  # km circa ISS
 
 # ----------------------
-# DATI NUOVI
+# DATI ISS REALI
 # ----------------------
 lat, lon = get_iss()
-st.session_state.track.append([lon, lat])
+if lat is None:
+    st.error("Impossibile ottenere i dati ISS")
+    st.stop()
 
-# limita storico a 300 punti
+st.session_state.track.append([lon, lat])
 if len(st.session_state.track) > 300:
     st.session_state.track.pop(0)
 
@@ -70,15 +72,24 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# LAYER ISS CON ICONA PERSONALIZZATA
+# ICONA ISS
 # ----------------------
-iss_layer = pdk.Layer(
-    "IconLayer",
-    data=[{"position": [lon, lat], "icon_data": "iss"}],
-    get_icon="icon_data",
+icon_data = [{
+    "position": [lon, lat],
+    "url": "https://upload.wikimedia.org/wikipedia/commons/d/d0/International_Space_Station.svg",
+    "width": 128,
+    "height": 128,
+    "anchorY": 128
+}]
+
+icon_layer = pdk.Layer(
+    type="IconLayer",
+    data=icon_data,
+    get_icon="url",
     get_size=4,
     size_scale=15,
     get_position="position",
+    get_pixel_offset=[0,0],
 )
 
 # ----------------------
@@ -94,24 +105,22 @@ path_layer = pdk.Layer(
 )
 
 # ----------------------
-# MAPPA - GLOBO 3D
+# MAPPA
 # ----------------------
-view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=2, pitch=45)
-
+view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=2, pitch=30)
 deck = pdk.Deck(
-    layers=[path_layer, iss_layer],
+    layers=[path_layer, icon_layer],
     initial_view_state=view_state,
-    map_style="mapbox://styles/mapbox/satellite-v9"  # mappa terrestre realistica
+    map_style="light",  # mappa integrata, visibile su Streamlit Cloud
 )
 
 st.pydeck_chart(deck)
 
 # ----------------------
-# BOX METRICHE
+# TELEMETRIA IN BOX
 # ----------------------
 st.subheader("📡 Telemetria ISS")
 col1, col2, col3, col4, col5 = st.columns(5)
-
 col1.metric("Latitudine", f"{lat:.4f}°")
 col2.metric("Longitudine", f"{lon:.4f}°")
 col3.metric("Velocità", f"{speed:.0f} km/h")
