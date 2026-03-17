@@ -4,6 +4,9 @@ import pydeck as pdk
 from streamlit_autorefresh import st_autorefresh
 import math
 from datetime import datetime
+from geopy.geocoders import Nominatim
+from timezonefinder import TimezoneFinder
+import pytz
 
 # ----------------------
 # CONFIG
@@ -19,13 +22,24 @@ URL = "http://api.open-notify.org/iss-now.json"
 # ----------------------
 # TOGGLE LIGHT/DARK
 # ----------------------
+if "light_mode" not in st.session_state:
+    st.session_state.light_mode = False
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = True
+
+def toggle_light():
+    st.session_state.dark_mode = not st.session_state.light_mode
+
+def toggle_dark():
+    st.session_state.light_mode = not st.session_state.dark_mode
+
 col1, col2 = st.columns(2)
 with col1:
-    light_mode = st.checkbox("🌕 Light Mode", value=False)
+    st.checkbox("🌕 Light Mode", value=st.session_state.light_mode, key="light_mode", on_change=toggle_light)
 with col2:
-    dark_mode = st.checkbox("🌑 Dark Mode", value=not light_mode)
+    st.checkbox("🌑 Dark Mode", value=st.session_state.dark_mode, key="dark_mode", on_change=toggle_dark)
 
-map_style = "light" if light_mode else "dark"
+map_style = "light" if st.session_state.light_mode else "dark"
 
 # ----------------------
 # FUNZIONI
@@ -46,6 +60,22 @@ def distanza(lat1, lon1, lat2, lon2):
     a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlon/2)**2
     c = 2*math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
+
+def get_city_and_time(lat, lon):
+    try:
+        geolocator = Nominatim(user_agent="iss_tracker")
+        location = geolocator.reverse((lat, lon), language="en", zoom=10)
+        city = location.raw.get('address', {}).get('city') \
+               or location.raw.get('address', {}).get('town') \
+               or location.raw.get('address', {}).get('village') \
+               or "Sconosciuta"
+        tf = TimezoneFinder()
+        tz_name = tf.timezone_at(lat=lat, lng=lon)
+        tz = pytz.timezone(tz_name) if tz_name else pytz.utc
+        local_time = datetime.now(tz).strftime("%H:%M:%S")
+        return city, tz_name, local_time
+    except:
+        return "Sconosciuta", "UTC", datetime.utcnow().strftime("%H:%M:%S")
 
 # ----------------------
 # SESSION STATE
@@ -78,7 +108,7 @@ speed = 0
 if st.session_state.last:
     lat1, lon1 = st.session_state.last
     dist = distanza(lat1, lon1, lat, lon)
-    speed = dist / (10 / 3600)
+    speed = dist / (10 / 3600)  # km/h
 
 st.session_state.last = (lat, lon)
 
@@ -107,17 +137,15 @@ path_layer = pdk.Layer(
 )
 
 # ----------------------
-# GLOBO 3D
+# MAPPA SATELLITE 3D (stile globo)
 # ----------------------
-view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=1, pitch=30, bearing=0)
+view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=1.5, pitch=50, bearing=30)
 deck = pdk.Deck(
     layers=[path_layer, iss_layer],
     initial_view_state=view_state,
-    map_style=f"mapbox://styles/mapbox/{map_style}-v10",
-    views=[pdk.GlobeView()],
+    map_style="mapbox://styles/mapbox/satellite-v9",
     tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
 )
-
 st.pydeck_chart(deck)
 
 # ----------------------
@@ -130,3 +158,13 @@ col2.metric("Longitudine", f"{lon:.4f}°")
 col3.metric("Velocità", f"{speed:.0f} km/h")
 col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
 col5.metric("Aggiornamento", datetime.now().strftime("%H:%M:%S"))
+
+# ----------------------
+# CITTÀ SORVOLATA E ORARIO LOCALE
+# ----------------------
+st.subheader("🏙️ Città sorvolata")
+city, tz_name, local_time = get_city_and_time(lat, lon)
+col_city, col_tz, col_time = st.columns(3)
+col_city.metric("Città più vicina", city)
+col_tz.metric("Fuso orario", tz_name)
+col_time.metric("Orario locale", local_time)
