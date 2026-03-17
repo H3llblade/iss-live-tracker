@@ -9,7 +9,7 @@ from datetime import datetime
 # CONFIG
 # ----------------------
 st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
-st.title("🛰️ NASA ISS Mission Control - Globe 3D con Emoji")
+st.title("🛰️ NASA ISS Mission Control - Globe 3D")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -51,7 +51,7 @@ if "last" not in st.session_state:
     st.session_state.last = None
 
 if "altitude" not in st.session_state:
-    st.session_state.altitude = 420  # km circa ISS
+    st.session_state.altitude = 420
 
 # ----------------------
 # DATI ISS
@@ -72,27 +72,19 @@ speed = 0
 if st.session_state.last:
     lat1, lon1 = st.session_state.last
     dist = distanza(lat1, lon1, lat, lon)
-    speed = dist / (10 / 3600)  # km/h
+    speed = dist / (10 / 3600)
 
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# ICONA ISS CON EMOJI
+# ICONA ISS (ScatterplotLayer)
 # ----------------------
-emoji_data = [{
-    "position": [lon, lat],
-    "text": "🛰️"
-}]
-
-emoji_layer = pdk.Layer(
-    "TextLayer",
-    data=emoji_data,
+iss_layer = pdk.Layer(
+    "ScatterplotLayer",
+    data=[{"position": [lon, lat]}],
     get_position="position",
-    get_text="text",
-    get_size=60,
-    get_angle=0,
-    get_text_anchor='"middle"',
-    get_alignment_baseline='"center"',
+    get_color=[255, 215, 0],  # giallo brillante
+    get_radius=2500,  
     pickable=True,
 )
 
@@ -113,7 +105,7 @@ path_layer = pdk.Layer(
 # ----------------------
 view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=1.5, pitch=45, bearing=0)
 deck = pdk.Deck(
-    layers=[path_layer, emoji_layer],
+    layers=[path_layer, iss_layer],
     initial_view_state=view_state,
     map_style=map_style,
     tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
