@@ -173,7 +173,7 @@ def get_location_and_time(lat, lon):
         address = location.raw.get('address', {})
         # Stato e regione/provincia
         state = address.get('state') or address.get('region') or address.get('country')
-        region = address.get('county') or address.get('state_district') or ""
+        region = address.get('county') or address.get('state_district') or "---"
         if not state:
             return "Over Ocean", "", "UTC", datetime.utcnow().strftime("%H:%M:%S")
         tf = TimezoneFinder()
