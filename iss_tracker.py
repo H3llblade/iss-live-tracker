@@ -11,7 +11,7 @@ from datetime import datetime
 st.set_page_config(layout="wide")
 st.title("🛰️ NASA ISS MISSION CONTROL")
 
-# Refresh fluido (10 secondi)
+# Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
 
 URL = "http://api.open-notify.org/iss-now.json"
@@ -20,16 +20,19 @@ URL = "http://api.open-notify.org/iss-now.json"
 # DATI ISS
 # ----------------------
 def get_iss():
-    data = requests.get(URL).json()
-    lat = float(data['iss_position']['latitude'])
-    lon = float(data['iss_position']['longitude'])
-    return lat, lon
+    try:
+        data = requests.get(URL, timeout=5).json()
+        lat = float(data['iss_position']['latitude'])
+        lon = float(data['iss_position']['longitude'])
+        return lat, lon
+    except:
+        return 0, 0
 
 # ----------------------
 # DISTANZA (velocità)
 # ----------------------
 def distanza(lat1, lon1, lat2, lon2):
-    R = 6371
+    R = 6371  # raggio Terra km
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
 
@@ -47,24 +50,27 @@ if "track" not in st.session_state:
 if "last" not in st.session_state:
     st.session_state.last = None
 
+if "altitude" not in st.session_state:
+    st.session_state.altitude = 420  # km circa ISS
+
 # ----------------------
 # NUOVI DATI
 # ----------------------
 lat, lon = get_iss()
 st.session_state.track.append([lon, lat])  # pydeck usa [lon, lat]
 
-# limita storico
+# limita storico a 200 punti
 if len(st.session_state.track) > 200:
     st.session_state.track.pop(0)
 
 # ----------------------
-# VELOCITÀ REALE
+# VELOCITÀ ISTANTANEA
 # ----------------------
 speed = 0
 if st.session_state.last:
     lat1, lon1 = st.session_state.last
     dist = distanza(lat1, lon1, lat, lon)
-    speed = dist / (10 / 3600)
+    speed = dist / (10 / 3600)  # km/h
 
 st.session_state.last = (lat, lon)
 
@@ -102,12 +108,12 @@ view_state = pdk.ViewState(
 )
 
 # ----------------------
-# MAPPA (STILE NASA)
+# MAPPA
 # ----------------------
 deck = pdk.Deck(
     layers=[path_layer, iss_layer],
     initial_view_state=view_state,
-    map_style="mapbox://styles/mapbox/dark-v10"
+    map_style="dark"
 )
 
 st.pydeck_chart(deck)
@@ -117,11 +123,12 @@ st.pydeck_chart(deck)
 # ----------------------
 st.subheader("📡 Telemetria ISS")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Latitudine", f"{lat:.4f}")
-col2.metric("Longitudine", f"{lon:.4f}")
-col3.metric("Velocità km/h", f"{speed:.0f}")
+col1.metric("Latitudine", f"{lat:.4f}°")
+col2.metric("Longitudine", f"{lon:.4f}°")
+col3.metric("Velocità", f"{speed:.0f} km/h")
+col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
 
 # ----------------------
 # INFO EXTRA
