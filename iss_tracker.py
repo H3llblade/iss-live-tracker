@@ -158,11 +158,33 @@ col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
 col5.metric("Aggiornamento", datetime.now().strftime("%H:%M:%S"))
 
 # ----------------------
-# CITTÀ SORVOLATA E ORARIO LOCALE
+# FUNZIONE PER STATO/REGIONE E ORARIO LOCALE
 # ----------------------
-st.subheader("🏙️ Città sorvolata")
-city, tz_name, local_time = get_city_and_time(lat, lon)
-col_city, col_tz, col_time = st.columns(3)
-col_city.metric("Città più vicina", city)
+def get_location_and_time(lat, lon):
+    try:
+        geolocator = Nominatim(user_agent="iss_tracker")
+        location = geolocator.reverse((lat, lon), language="en", zoom=5)
+        address = location.raw.get('address', {})
+        # Stato e regione/provincia
+        state = address.get('state') or address.get('region') or address.get('country')
+        region = address.get('county') or address.get('state_district') or ""
+        if not state:
+            return "Over Ocean", "", "UTC", datetime.utcnow().strftime("%H:%M:%S")
+        tf = TimezoneFinder()
+        tz_name = tf.timezone_at(lat=lat, lng=lon)
+        tz = pytz.timezone(tz_name) if tz_name else pytz.utc
+        local_time = datetime.now(tz).strftime("%H:%M:%S")
+        return state, region, tz_name, local_time
+    except:
+        return "Sconosciuto", "", "UTC", datetime.utcnow().strftime("%H:%M:%S")
+
+# ----------------------
+# CITTÀ/STATO SORVOLATO E ORARIO LOCALE
+# ----------------------
+st.subheader("🗺️ Posizione sorvolata")
+state, region, tz_name, local_time = get_location_and_time(lat, lon)
+col_state, col_region, col_tz, col_time = st.columns(4)
+col_state.metric("Stato", state)
+col_region.metric("Regione/Provincia", region)
 col_tz.metric("Fuso orario", tz_name)
 col_time.metric("Orario locale", local_time)
