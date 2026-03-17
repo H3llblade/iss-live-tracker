@@ -1,148 +1,133 @@
 import streamlit as st
 import requests
-import folium
-from streamlit_folium import st_folium
-from datetime import datetime
+import plotly.graph_objects as go
 import math
 from streamlit_autorefresh import st_autorefresh
 
 # ----------------------
-# CONFIG PAGINA
+# CONFIG
 # ----------------------
-st.set_page_config(
-    page_title="ISS Mission Control",
-    layout="wide"
-)
+st.set_page_config(layout="wide")
+st.title("🛰️ ISS ORBITAL TRACKER — SPACE MODE")
 
-# ----------------------
-# AUTO REFRESH (30s)
-# ----------------------
-st_autorefresh(interval=30000, key="iss_refresh")
+# Auto refresh ogni 5 secondi (più fluido)
+st_autorefresh(interval=5000, key="refresh")
 
-# ----------------------
-# STILE DARK NASA
-# ----------------------
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #0b0f1a;
-        color: white;
-    }
-    h1, h2, h3 {
-        color: #00e6ff;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# ----------------------
-# HEADER
-# ----------------------
-st.title("🛰️ ISS MISSION CONTROL")
-st.caption("Live tracking della Stazione Spaziale Internazionale")
-
-# ----------------------
-# API
-# ----------------------
 URL = "http://api.open-notify.org/iss-now.json"
 
-def get_iss_position():
-    response = requests.get(URL)
-    data = response.json()
-    return float(data['iss_position']['latitude']), float(data['iss_position']['longitude'])
+# ----------------------
+# FUNZIONE DATI
+# ----------------------
+def get_iss():
+    data = requests.get(URL).json()
+    lat = float(data['iss_position']['latitude'])
+    lon = float(data['iss_position']['longitude'])
+    return lat, lon
 
 # ----------------------
-# DISTANZA (Haversine)
+# CONVERSIONE LAT/LON → 3D
 # ----------------------
-def distanza(lat1, lon1, lat2, lon2):
-    R = 6371
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
+def latlon_to_xyz(lat, lon, r=1):
+    lat = math.radians(lat)
+    lon = math.radians(lon)
 
-    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    x = r * math.cos(lat) * math.cos(lon)
+    y = r * math.cos(lat) * math.sin(lon)
+    z = r * math.sin(lat)
 
-    return R * c
-
-# ----------------------
-# CHECK ITALIA
-# ----------------------
-def sopra_italia(lat, lon):
-    return 36 < lat < 47 and 6 < lon < 19
+    return x, y, z
 
 # ----------------------
 # SESSION STATE
 # ----------------------
-if "percorso" not in st.session_state:
-    st.session_state.percorso = []
-
-if "last_pos" not in st.session_state:
-    st.session_state.last_pos = None
+if "track" not in st.session_state:
+    st.session_state.track = []
 
 # ----------------------
-# DATI ISS
+# DATI
 # ----------------------
-lat, lon = get_iss_position()
-st.session_state.percorso.append([lat, lon])
+lat, lon = get_iss()
+st.session_state.track.append((lat, lon))
 
-# ----------------------
-# METRICHE
-# ----------------------
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric("🌍 Latitudine", f"{lat:.4f}")
-col2.metric("🌍 Longitudine", f"{lon:.4f}")
-
-velocita = 0
-if st.session_state.last_pos:
-    lat1, lon1 = st.session_state.last_pos
-    dist = distanza(lat1, lon1, lat, lon)
-    velocita = dist / (30 / 3600)
-
-col3.metric("🚀 Velocità km/h", f"{velocita:.0f}")
-
-stato = "🇮🇹 SOPRA ITALIA" if sopra_italia(lat, lon) else "🌌 IN ORBITA"
-col4.metric("📡 Stato", stato)
-
-st.session_state.last_pos = (lat, lon)
+# Limita punti (performance)
+if len(st.session_state.track) > 100:
+    st.session_state.track.pop(0)
 
 # ----------------------
-# MAPPA DARK
+# CONVERSIONE TRACK
 # ----------------------
-mappa = folium.Map(
-    location=[lat, lon],
-    zoom_start=3,
-    tiles="CartoDB dark_matter"
+xs, ys, zs = [], [], []
+
+for lat_i, lon_i in st.session_state.track:
+    x, y, z = latlon_to_xyz(lat_i, lon_i)
+    xs.append(x)
+    ys.append(y)
+    zs.append(z)
+
+# posizione attuale
+x, y, z = latlon_to_xyz(lat, lon)
+
+# ----------------------
+# GLOBO TERRA
+# ----------------------
+sphere = go.Surface(
+    x=[[math.cos(u)*math.sin(v) for u in [i*0.1 for i in range(63)]] for v in [i*0.1 for i in range(63)]],
+    y=[[math.sin(u)*math.sin(v) for u in [i*0.1 for i in range(63)]] for v in [i*0.1 for i in range(63)]],
+    z=[[math.cos(v) for u in [i*0.1 for i in range(63)]] for v in [i*0.1 for i in range(63)]],
+    colorscale="Blues",
+    showscale=False,
+    opacity=0.6
 )
 
-# Marker ISS
-folium.CircleMarker(
-    location=[lat, lon],
-    radius=8,
-    color="cyan",
-    fill=True,
-    fill_color="cyan"
-).add_to(mappa)
-
-# Percorso
-if len(st.session_state.percorso) > 1:
-    folium.PolyLine(
-        st.session_state.percorso,
-        color="cyan",
-        weight=2
-    ).add_to(mappa)
-
-st_folium(mappa, width=1200, height=500, key="map")
+# ----------------------
+# ISS TRACK
+# ----------------------
+track_line = go.Scatter3d(
+    x=xs,
+    y=ys,
+    z=zs,
+    mode='lines',
+    line=dict(color='cyan', width=4),
+    name="Orbita"
+)
 
 # ----------------------
-# STORICO
+# ISS PUNTO
 # ----------------------
-st.subheader("📍 Traiettoria recente")
+iss_point = go.Scatter3d(
+    x=[x],
+    y=[y],
+    z=[z],
+    mode='markers',
+    marker=dict(size=6, color='red'),
+    name="ISS"
+)
 
-for i, pos in enumerate(st.session_state.percorso[-10:][::-1]):
-    st.write(f"{i+1}. Lat: {pos[0]:.4f}, Lon: {pos[1]:.4f}")
+# ----------------------
+# FIGURA
+# ----------------------
+fig = go.Figure(data=[sphere, track_line, iss_point])
+
+fig.update_layout(
+    scene=dict(
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        zaxis=dict(visible=False),
+        bgcolor="black"
+    ),
+    margin=dict(l=0, r=0, t=0, b=0)
+)
 
 # ----------------------
-# FOOTER
+# OUTPUT
 # ----------------------
-st.markdown("---")
-st.caption(f"🕒 Ultimo aggiornamento: {datetime.now().strftime('%H:%M:%S')}")
+st.plotly_chart(fig, use_container_width=True)
+
+# ----------------------
+# DATI LIVE
+# ----------------------
+st.subheader("📡 Telemetria")
+
+col1, col2 = st.columns(2)
+col1.metric("Latitudine", f"{lat:.4f}")
+col2.metric("Longitudine", f"{lon:.4f}")
