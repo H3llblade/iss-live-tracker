@@ -8,8 +8,8 @@ from datetime import datetime
 # ----------------------
 # CONFIG
 # ----------------------
-st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
-st.title("🛰️ NASA ISS Mission Control - Globe 3D")
+st.set_page_config(layout="wide", page_title="NASA ISS Tracking")
+st.title("🛰️ NASA ISS TRACKING")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -17,9 +17,13 @@ st_autorefresh(interval=10000, key="refresh")
 URL = "http://api.open-notify.org/iss-now.json"
 
 # ----------------------
-# SELEZIONE STILE MAPPA
+# SELEZIONE LIGHT/DARK IN RIGA
 # ----------------------
-map_style = st.selectbox("Seleziona stile mappa:", ["light", "dark"])
+col_light, col_dark = st.columns([1,1])
+with col_light:
+    light_mode = st.checkbox("🌕 Light Mode", value=False)
+# Dark mode implicito se light_mode è False
+map_style = "light" if light_mode else "dark"
 
 # ----------------------
 # FUNZIONI
@@ -83,8 +87,8 @@ iss_layer = pdk.Layer(
     "ScatterplotLayer",
     data=[{"position": [lon, lat]}],
     get_position="position",
-    get_color=[255, 215, 0],  # giallo brillante
-    get_radius=25000,  
+    get_color=[255, 215, 0],
+    get_radius=25000,
     pickable=True,
 )
 
