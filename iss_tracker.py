@@ -61,21 +61,45 @@ def distanza(lat1, lon1, lat2, lon2):
     c = 2*math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
 
-def get_city_and_time(lat, lon):
-    try:
-        geolocator = Nominatim(user_agent="iss_tracker")
-        location = geolocator.reverse((lat, lon), language="en", zoom=10)
-        city = location.raw.get('address', {}).get('city') \
-               or location.raw.get('address', {}).get('town') \
-               or location.raw.get('address', {}).get('village') \
-               or "Sconosciuta"
-        tf = TimezoneFinder()
-        tz_name = tf.timezone_at(lat=lat, lng=lon)
-        tz = pytz.timezone(tz_name) if tz_name else pytz.utc
-        local_time = datetime.now(tz).strftime("%H:%M:%S")
-        return city, tz_name, local_time
-    except:
-        return "Sconosciuta", "UTC", datetime.utcnow().strftime("%H:%M:%S")
+def get_city_and_time_cached(lat, lon):
+    """Restituisce città e ora locale con caching"""
+    if "last_city_lat" not in st.session_state:
+        st.session_state.last_city_lat = None
+        st.session_state.last_city_lon = None
+        st.session_state.cached_city = "Sconosciuta"
+        st.session_state.cached_tz = "UTC"
+        st.session_state.cached_time = datetime.utcnow().strftime("%H:%M:%S")
+    
+    # Aggiorna solo se ISS si è spostata >0.1°
+    if (st.session_state.last_city_lat is None or
+        abs(lat - st.session_state.last_city_lat) > 0.1 or
+        abs(lon - st.session_state.last_city_lon) > 0.1):
+        
+        try:
+            geolocator = Nominatim(user_agent="iss_tracker")
+            location = geolocator.reverse((lat, lon), language="en", zoom=10)
+            city = location.raw.get('address', {}).get('city') \
+                   or location.raw.get('address', {}).get('town') \
+                   or location.raw.get('address', {}).get('village') \
+                   or "Sconosciuta"
+            tf = TimezoneFinder()
+            tz_name = tf.timezone_at(lat=lat, lng=lon)
+            tz = pytz.timezone(tz_name) if tz_name else pytz.utc
+            local_time = datetime.now(tz).strftime("%H:%M:%S")
+            
+            # aggiorna cache
+            st.session_state.last_city_lat = lat
+            st.session_state.last_city_lon = lon
+            st.session_state.cached_city = city
+            st.session_state.cached_tz = tz_name
+            st.session_state.cached_time = local_time
+            
+        except:
+            st.session_state.cached_city = "Sconosciuta"
+            st.session_state.cached_tz = "UTC"
+            st.session_state.cached_time = datetime.utcnow().strftime("%H:%M:%S")
+    
+    return st.session_state.cached_city, st.session_state.cached_tz, st.session_state.cached_time
 
 # ----------------------
 # SESSION STATE
@@ -88,6 +112,9 @@ if "last" not in st.session_state:
 
 if "altitude" not in st.session_state:
     st.session_state.altitude = 420
+
+if "bearing" not in st.session_state:
+    st.session_state.bearing = 0  # per rotazione automatica
 
 # ----------------------
 # DATI ISS
@@ -113,15 +140,21 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# LAYER ISS
+# AGGIORNA ROTAZIONE GLOBO
+# ----------------------
+st.session_state.bearing += 3  # aumenta 3 gradi ogni refresh
+
+# ----------------------
+# LAYER ISS (emoji)
 # ----------------------
 iss_layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=[{"position": [lon, lat]}],
+    "TextLayer",
+    data=[{"position": [lon, lat], "text": "🛰️"}],
     get_position="position",
+    get_text="text",
     get_color=[255, 215, 0],
-    get_radius=250000,
-    pickable=True,
+    get_size=60,
+    size_units="meters",
 )
 
 # ----------------------
@@ -137,15 +170,23 @@ path_layer = pdk.Layer(
 )
 
 # ----------------------
-# MAPPA SATELLITE 3D (stile globo)
+# MAPPA SATELLITE 3D
 # ----------------------
-view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=1.5, pitch=50, bearing=30)
+view_state = pdk.ViewState(
+    latitude=lat,
+    longitude=lon,
+    zoom=1.5,
+    pitch=50,
+    bearing=st.session_state.bearing,
+)
+
 deck = pdk.Deck(
     layers=[path_layer, iss_layer],
     initial_view_state=view_state,
     map_style="mapbox://styles/mapbox/satellite-v9",
     tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
 )
+
 st.pydeck_chart(deck)
 
 # ----------------------
@@ -160,10 +201,10 @@ col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
 col5.metric("Aggiornamento", datetime.now().strftime("%H:%M:%S"))
 
 # ----------------------
-# CITTÀ SORVOLATA E ORARIO LOCALE
+# CITTÀ SORVOLATA E ORARIO LOCALE (caching)
 # ----------------------
 st.subheader("🏙️ Città sorvolata")
-city, tz_name, local_time = get_city_and_time(lat, lon)
+city, tz_name, local_time = get_city_and_time_cached(lat, lon)
 col_city, col_tz, col_time = st.columns(3)
 col_city.metric("Città più vicina", city)
 col_tz.metric("Fuso orario", tz_name)
