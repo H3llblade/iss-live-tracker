@@ -175,14 +175,14 @@ def get_location_and_time(lat, lon):
         state = address.get('state') or address.get('region') or address.get('country')
         region = address.get('county') or address.get('state_district') or "---"
         if not state:
-            return "Over Ocean", "", "UTC", datetime.utcnow().strftime("%H:%M:%S")
+            return "Over Ocean", "---", "UTC", datetime.utcnow().strftime("%H:%M:%S")
         tf = TimezoneFinder()
         tz_name = tf.timezone_at(lat=lat, lng=lon)
         tz = pytz.timezone(tz_name) if tz_name else pytz.utc
         local_time = datetime.now(tz).strftime("%H:%M:%S")
         return state, region, tz_name, local_time
     except:
-        return "Sconosciuto", "", "UTC", datetime.utcnow().strftime("%H:%M:%S")
+        return "Sconosciuto", "---", "UTC", datetime.utcnow().strftime("%H:%M:%S")
 
 # ----------------------
 # CITTÀ/STATO SORVOLATO E ORARIO LOCALE
