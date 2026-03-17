@@ -145,16 +145,15 @@ st.session_state.last = (lat, lon)
 st.session_state.bearing += 3  # aumenta 3 gradi ogni refresh
 
 # ----------------------
-# LAYER ISS (emoji)
+# LAYER ISS
 # ----------------------
 iss_layer = pdk.Layer(
-    "TextLayer",
-    data=[{"position": [lon, lat], "text": "🛰️"}],
+    "ScatterplotLayer",
+    data=[{"position": [lon, lat]}],
     get_position="position",
-    get_text="text",
-    get_color=[255, 215, 0],
-    get_size=60,
-    size_units="meters",
+    get_color=[255, 165, 0],  # arancione
+    get_radius=25000,         # raggio in metri
+    pickable=True,
 )
 
 # ----------------------
