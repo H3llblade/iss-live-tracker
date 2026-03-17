@@ -8,8 +8,8 @@ from datetime import datetime
 # ----------------------
 # CONFIG
 # ----------------------
-st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
-st.title("🛰️ NASA ISS MISSION CONTROL - Globe 3D")
+st.set_page_config(layout="wide", page_title="ISS Tracking")
+st.title("🛰️ NASA ISS TRACKING")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -77,11 +77,11 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# ICONA ISS (PNG visibile)
+# ICONA ISS VISIBILE (PNG)
 # ----------------------
 icon_data = [{
     "position": [lon, lat],
-    "url": "https://upload.wikimedia.org/wikipedia/commons/d/d0/International_Space_Station.svg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/International_Space_Station.svg/200px-International_Space_Station.svg.png",
     "width": 128,
     "height": 128,
     "anchorY": 128
