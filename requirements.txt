@@ -1,6 +1,6 @@
 streamlit
-requests
 pydeck
+requests
 streamlit-autorefresh
 geopy
 timezonefinder
