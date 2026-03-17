@@ -1,13 +1,12 @@
 import streamlit as st
 import requests
 import pydeck as pdk
-import math
 from datetime import datetime
 from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 import pytz
 
-st.set_page_config(layout="wide", page_title="NASA ISS Tracker - Fluido")
+st.set_page_config(layout="wide", page_title="NASA ISS Tracker")
 
 st.title("🛰️ NASA ISS Tracker - PyDeck Fluido")
 
@@ -21,24 +20,26 @@ if "last" not in st.session_state:
     st.session_state.last = None
 
 # ----------------------
+# LIGHT/DARK SELEZIONE
+# ----------------------
+theme = st.selectbox("Seleziona tema mappa", ["Light", "Dark"])
+tile_style = "https://basemaps.cartocdn.com/gl/positron/{z}/{x}/{y}{r}.png" if theme == "Light" \
+             else "https://basemaps.cartocdn.com/gl/dark_all/{z}/{x}/{y}{r}.png"
+
+# ----------------------
 # FUNZIONI
 # ----------------------
 def get_iss():
     try:
-        data = requests.get("http://api.open-notify.org/iss-now.json", timeout=5).json()
-        lat = float(data['iss_position']['latitude'])
-        lon = float(data['iss_position']['longitude'])
-        return lat, lon
+        # API HTTPS
+        data = requests.get("https://api.wheretheiss.at/v1/satellites/25544", timeout=5).json()
+        lat = float(data['latitude'])
+        lon = float(data['longitude'])
+        altitude = float(data.get('altitude', 420))  # km
+        speed = float(data.get('velocity', 27600))   # km/h
+        return lat, lon, altitude, speed
     except:
-        return None, None
-
-def distanza(lat1, lon1, lat2, lon2):
-    R = 6371
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlon/2)**2
-    c = 2*math.atan2(math.sqrt(a), math.sqrt(1-a))
-    return R * c
+        return None, None, None, None
 
 def get_city_and_time(lat, lon):
     try:
@@ -59,25 +60,15 @@ def get_city_and_time(lat, lon):
 # ----------------------
 # DATI ISS
 # ----------------------
-lat, lon = get_iss()
+lat, lon, altitude, speed = get_iss()
 if lat is None:
     st.error("Impossibile ottenere i dati ISS")
     st.stop()
 
+# Aggiorna traiettoria
 st.session_state.track.append([lon, lat])
 if len(st.session_state.track) > 300:
     st.session_state.track.pop(0)
-
-# ----------------------
-# VELOCITÀ ISTANTANEA
-# ----------------------
-speed = 0
-if st.session_state.last:
-    lat1, lon1 = st.session_state.last
-    dist = distanza(lat1, lon1, lat, lon)
-    speed = dist / (10 / 3600)
-
-st.session_state.last = (lat, lon)
 
 # ----------------------
 # LAYER ISS
@@ -111,21 +102,22 @@ view_state = pdk.ViewState(
 deck = pdk.Deck(
     layers=[path_layer, iss_layer],
     initial_view_state=view_state,
-    map_style="https://basemaps.cartocdn.com/gl/positron/{z}/{x}/{y}{r}.png",
+    map_style=tile_style,
     tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
 )
 
 st.pydeck_chart(deck)
 
 # ----------------------
-# TELEMETRIA
+# TELEMETRIA ISS
 # ----------------------
 st.subheader("📡 Telemetria ISS")
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Latitudine", f"{lat:.4f}°")
 col2.metric("Longitudine", f"{lon:.4f}°")
 col3.metric("Velocità", f"{speed:.0f} km/h")
-col4.metric("Aggiornamento", datetime.utcnow().strftime("%H:%M:%S"))
+col4.metric("Altitudine stimata", f"{altitude:.0f} km")
+col5.metric("Aggiornamento UTC", datetime.utcnow().strftime("%H:%M:%S"))
 
 # ----------------------
 # CITTÀ SORVOLATA
