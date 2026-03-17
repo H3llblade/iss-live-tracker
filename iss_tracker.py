@@ -1,18 +1,15 @@
 import streamlit as st
 import requests
+import pydeck as pdk
 import math
 from datetime import datetime
 from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 import pytz
-import folium
-from streamlit_folium import st_folium
 
-# ----------------------
-# CONFIG
-# ----------------------
-st.set_page_config(layout="wide", page_title="NASA ISS Tracker")
-st.title("🛰️ NASA ISS Tracker - Folium OpenStreetMap")
+st.set_page_config(layout="wide", page_title="NASA ISS Tracker - Fluido")
+
+st.title("🛰️ NASA ISS Tracker - PyDeck Fluido")
 
 # ----------------------
 # SESSION STATE
@@ -22,15 +19,6 @@ if "track" not in st.session_state:
 
 if "last" not in st.session_state:
     st.session_state.last = None
-
-if "altitude" not in st.session_state:
-    st.session_state.altitude = 420
-
-# ----------------------
-# LIGHT/DARK SELEZIONE
-# ----------------------
-theme = st.selectbox("Seleziona tema mappa", ["Light", "Dark"])
-tile_style = "OpenStreetMap" if theme == "Light" else "CartoDB dark_matter"
 
 # ----------------------
 # FUNZIONI
@@ -53,7 +41,6 @@ def distanza(lat1, lon1, lat2, lon2):
     return R * c
 
 def get_city_and_time(lat, lon):
-    """Restituisce città e ora locale corretta; gestisce oceano"""
     try:
         geolocator = Nominatim(user_agent="iss_tracker")
         location = geolocator.reverse((lat, lon), language="en", zoom=10)
@@ -77,7 +64,7 @@ if lat is None:
     st.error("Impossibile ottenere i dati ISS")
     st.stop()
 
-st.session_state.track.append([lat, lon])
+st.session_state.track.append([lon, lat])
 if len(st.session_state.track) > 300:
     st.session_state.track.pop(0)
 
@@ -88,45 +75,60 @@ speed = 0
 if st.session_state.last:
     lat1, lon1 = st.session_state.last
     dist = distanza(lat1, lon1, lat, lon)
-    speed = dist / (10 / 3600)  # km/h
+    speed = dist / (10 / 3600)
 
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# CREAZIONE MAPPA
+# LAYER ISS
 # ----------------------
-m = folium.Map(location=[lat, lon], zoom_start=2, tiles=tile_style)
+iss_layer = pdk.Layer(
+    "ScatterplotLayer",
+    data=[{"position": [lon, lat]}],
+    get_position="position",
+    get_color=[255, 165, 0],
+    get_radius=250000,
+)
 
-# Traiettoria
-if len(st.session_state.track) > 1:
-    folium.PolyLine(st.session_state.track, color="cyan", weight=2.5, opacity=0.8).add_to(m)
+# TRAIETTORIA
+path_layer = pdk.Layer(
+    "PathLayer",
+    data=[{"path": st.session_state.track}],
+    get_path="path",
+    get_color=[0, 255, 255],
+    width_scale=20,
+    width_min_pixels=2,
+)
 
-# ISS come pallino arancione
-folium.CircleMarker(
-    location=[lat, lon],
-    radius=8,
-    color="orange",
-    fill=True,
-    fill_color="orange",
-).add_to(m)
+# VIEW
+view_state = pdk.ViewState(
+    latitude=lat,
+    longitude=lon,
+    zoom=2,
+    pitch=45,
+)
 
-# Visualizza la mappa senza flash continuo
-st_folium(m, width=900, height=500)
+deck = pdk.Deck(
+    layers=[path_layer, iss_layer],
+    initial_view_state=view_state,
+    map_style="https://basemaps.cartocdn.com/gl/positron/{z}/{x}/{y}{r}.png",
+    tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
+)
+
+st.pydeck_chart(deck)
 
 # ----------------------
-# TELEMETRIA ISS
+# TELEMETRIA
 # ----------------------
 st.subheader("📡 Telemetria ISS")
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Latitudine", f"{lat:.4f}°")
 col2.metric("Longitudine", f"{lon:.4f}°")
 col3.metric("Velocità", f"{speed:.0f} km/h")
-col4.metric("Altitudine stimata", f"{st.session_state.altitude} km")
-col5.metric("Aggiornamento", datetime.now().strftime("%H:%M:%S"))
+col4.metric("Aggiornamento", datetime.utcnow().strftime("%H:%M:%S"))
 
 # ----------------------
-# CITTÀ SORVOLATA E ORARIO LOCALE
-# ----------------------
+# CITTÀ SORVOLATA
 st.subheader("🏙️ Città sorvolata")
 city, tz_name, local_time = get_city_and_time(lat, lon)
 col_city, col_tz, col_time = st.columns(3)
