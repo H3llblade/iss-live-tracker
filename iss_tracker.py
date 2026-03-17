@@ -20,12 +20,27 @@ st_autorefresh(interval=10000, key="refresh")
 URL = "http://api.open-notify.org/iss-now.json"
 
 # ----------------------
-# SELEZIONE LIGHT/DARK
+# SELEZIONE LIGHT/DARK CON DUE CHECKBOX
 # ----------------------
-col_light, col_dark = st.columns([1,1])
-with col_light:
-    light_mode = st.checkbox("🌕 Light Mode", value=False)
-map_style = "light" if light_mode else "dark"
+# Stato iniziale
+if "light_mode" not in st.session_state:
+    st.session_state.light_mode = False
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = True
+
+def toggle_light():
+    st.session_state.dark_mode = not st.session_state.light_mode
+
+def toggle_dark():
+    st.session_state.light_mode = not st.session_state.dark_mode
+
+col1, col2 = st.columns(2)
+with col1:
+    st.checkbox("🌕 Light Mode", value=st.session_state.light_mode, key="light_mode", on_change=toggle_light)
+with col2:
+    st.checkbox("🌑 Dark Mode", value=st.session_state.dark_mode, key="dark_mode", on_change=toggle_dark)
+
+map_style = "light" if st.session_state.light_mode else "dark"
 
 # ----------------------
 # FUNZIONI
@@ -103,7 +118,7 @@ iss_layer = pdk.Layer(
     data=[{"position": [lon, lat]}],
     get_position="position",
     get_color=[255, 215, 0],
-    get_radius=25000,
+    get_radius=250000,
     pickable=True,
 )
 
