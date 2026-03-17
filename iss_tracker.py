@@ -11,8 +11,8 @@ import pytz
 # ----------------------
 # CONFIG
 # ----------------------
-st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
-st.title("🛰️ NASA ISS Mission Control - Globe 3D")
+st.set_page_config(layout="wide", page_title="NASA ISS TRACKER")
+st.title("🛰️ NASA ISS TRACKER")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
