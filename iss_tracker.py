@@ -9,7 +9,7 @@ from datetime import datetime
 # CONFIG
 # ----------------------
 st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
-st.title("🛰️ NASA ISS Mission Control - Globe 3D")
+st.title("🛰️ NASA ISS Mission Control - Globe 3D con Emoji")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -77,14 +77,22 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# ICONA ISS SEMPLICE (ScatterplotLayer)
+# ICONA ISS CON EMOJI
 # ----------------------
-iss_layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=[{"position": [lon, lat]}],
+emoji_data = [{
+    "position": [lon, lat],
+    "text": "🛰️"
+}]
+
+emoji_layer = pdk.Layer(
+    "TextLayer",
+    data=emoji_data,
     get_position="position",
-    get_color=[255, 165, 0],  # arancione visibile su light/dark
-    get_radius=200000,
+    get_text="text",
+    get_size=60,
+    get_angle=0,
+    get_text_anchor='"middle"',
+    get_alignment_baseline='"center"',
     pickable=True,
 )
 
@@ -105,7 +113,7 @@ path_layer = pdk.Layer(
 # ----------------------
 view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=1.5, pitch=45, bearing=0)
 deck = pdk.Deck(
-    layers=[path_layer, iss_layer],
+    layers=[path_layer, emoji_layer],
     initial_view_state=view_state,
     map_style=map_style,
     tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
