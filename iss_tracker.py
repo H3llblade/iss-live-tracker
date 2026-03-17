@@ -7,6 +7,7 @@ from timezonefinder import TimezoneFinder
 import pytz
 import folium
 from streamlit_folium import st_folium
+from streamlit_autorefresh import st_autorefresh
 
 # ----------------------
 # CONFIG
