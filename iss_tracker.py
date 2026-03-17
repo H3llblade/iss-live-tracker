@@ -9,12 +9,17 @@ from datetime import datetime
 # CONFIG
 # ----------------------
 st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
-st.title("🛰️ NASA ISS MISSION CONTROL")
+st.title("🛰️ NASA ISS MISSION CONTROL - Globe 3D")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
 
 URL = "http://api.open-notify.org/iss-now.json"
+
+# ----------------------
+# SELEZIONE STILE MAPPA
+# ----------------------
+map_style = st.selectbox("Seleziona stile mappa:", ["light", "dark"])
 
 # ----------------------
 # FUNZIONI
@@ -49,7 +54,7 @@ if "altitude" not in st.session_state:
     st.session_state.altitude = 420  # km circa ISS
 
 # ----------------------
-# DATI ISS REALI
+# DATI ISS
 # ----------------------
 lat, lon = get_iss()
 if lat is None:
@@ -72,7 +77,7 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# ICONA ISS
+# ICONA ISS (PNG visibile)
 # ----------------------
 icon_data = [{
     "position": [lon, lat],
@@ -89,7 +94,6 @@ icon_layer = pdk.Layer(
     get_size=4,
     size_scale=15,
     get_position="position",
-    get_pixel_offset=[0,0],
 )
 
 # ----------------------
@@ -105,13 +109,14 @@ path_layer = pdk.Layer(
 )
 
 # ----------------------
-# MAPPA
+# MAPPA 3D GLOBO
 # ----------------------
-view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=2, pitch=30)
+view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=1.5, pitch=45, bearing=0)
 deck = pdk.Deck(
     layers=[path_layer, icon_layer],
     initial_view_state=view_state,
-    map_style="light",  # mappa integrata, visibile su Streamlit Cloud
+    map_style=map_style,
+    tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
 )
 
 st.pydeck_chart(deck)
