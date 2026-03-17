@@ -8,8 +8,8 @@ from datetime import datetime
 # ----------------------
 # CONFIG
 # ----------------------
-st.set_page_config(layout="wide", page_title="ISS Tracking")
-st.title("🛰️ NASA ISS TRACKING")
+st.set_page_config(layout="wide", page_title="NASA ISS Mission Control")
+st.title("🛰️ NASA ISS Mission Control - Globe 3D")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -77,23 +77,15 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# ICONA ISS VISIBILE (PNG)
+# ICONA ISS SEMPLICE (ScatterplotLayer)
 # ----------------------
-icon_data = [{
-    "position": [lon, lat],
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/International_Space_Station.svg/200px-International_Space_Station.svg.png",
-    "width": 128,
-    "height": 128,
-    "anchorY": 128
-}]
-
-icon_layer = pdk.Layer(
-    type="IconLayer",
-    data=icon_data,
-    get_icon="url",
-    get_size=4,
-    size_scale=15,
+iss_layer = pdk.Layer(
+    "ScatterplotLayer",
+    data=[{"position": [lon, lat]}],
     get_position="position",
+    get_color=[255, 165, 0],  # arancione visibile su light/dark
+    get_radius=200000,
+    pickable=True,
 )
 
 # ----------------------
@@ -113,7 +105,7 @@ path_layer = pdk.Layer(
 # ----------------------
 view_state = pdk.ViewState(latitude=lat, longitude=lon, zoom=1.5, pitch=45, bearing=0)
 deck = pdk.Deck(
-    layers=[path_layer, icon_layer],
+    layers=[path_layer, iss_layer],
     initial_view_state=view_state,
     map_style=map_style,
     tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
