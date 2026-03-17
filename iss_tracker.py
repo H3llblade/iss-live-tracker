@@ -15,7 +15,7 @@ st.set_page_config(layout="wide", page_title="NASA ISS TRACKER")
 st.title("🛰️ NASA ISS TRACKER")
 
 # Refresh automatico ogni 10 secondi
-st_autorefresh(interval=10000, key="refresh")
+st_autorefresh(interval=30000, key="refresh")
 
 URL = "http://api.open-notify.org/iss-now.json"
 
