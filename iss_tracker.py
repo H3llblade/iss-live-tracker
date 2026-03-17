@@ -1,22 +1,23 @@
 import streamlit as st
 import requests
-import plotly.graph_objects as go
-import math
+import pydeck as pdk
 from streamlit_autorefresh import st_autorefresh
+import math
+from datetime import datetime
 
 # ----------------------
 # CONFIG
 # ----------------------
 st.set_page_config(layout="wide")
-st.title("🛰️ ISS ORBITAL TRACKER — SPACE MODE")
+st.title("🛰️ NASA ISS MISSION CONTROL")
 
-# Auto refresh ogni 5 secondi (più fluido)
-st_autorefresh(interval=5000, key="refresh")
+# Refresh fluido (10 secondi)
+st_autorefresh(interval=10000, key="refresh")
 
 URL = "http://api.open-notify.org/iss-now.json"
 
 # ----------------------
-# FUNZIONE DATI
+# DATI ISS
 # ----------------------
 def get_iss():
     data = requests.get(URL).json()
@@ -25,17 +26,17 @@ def get_iss():
     return lat, lon
 
 # ----------------------
-# CONVERSIONE LAT/LON → 3D
+# DISTANZA (velocità)
 # ----------------------
-def latlon_to_xyz(lat, lon, r=1):
-    lat = math.radians(lat)
-    lon = math.radians(lon)
+def distanza(lat1, lon1, lat2, lon2):
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
 
-    x = r * math.cos(lat) * math.cos(lon)
-    y = r * math.cos(lat) * math.sin(lon)
-    z = r * math.sin(lat)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
-    return x, y, z
+    return R * c
 
 # ----------------------
 # SESSION STATE
@@ -43,91 +44,87 @@ def latlon_to_xyz(lat, lon, r=1):
 if "track" not in st.session_state:
     st.session_state.track = []
 
+if "last" not in st.session_state:
+    st.session_state.last = None
+
 # ----------------------
-# DATI
+# NUOVI DATI
 # ----------------------
 lat, lon = get_iss()
-st.session_state.track.append((lat, lon))
+st.session_state.track.append([lon, lat])  # pydeck usa [lon, lat]
 
-# Limita punti (performance)
-if len(st.session_state.track) > 100:
+# limita storico
+if len(st.session_state.track) > 200:
     st.session_state.track.pop(0)
 
 # ----------------------
-# CONVERSIONE TRACK
+# VELOCITÀ REALE
 # ----------------------
-xs, ys, zs = [], [], []
+speed = 0
+if st.session_state.last:
+    lat1, lon1 = st.session_state.last
+    dist = distanza(lat1, lon1, lat, lon)
+    speed = dist / (10 / 3600)
 
-for lat_i, lon_i in st.session_state.track:
-    x, y, z = latlon_to_xyz(lat_i, lon_i)
-    xs.append(x)
-    ys.append(y)
-    zs.append(z)
-
-# posizione attuale
-x, y, z = latlon_to_xyz(lat, lon)
+st.session_state.last = (lat, lon)
 
 # ----------------------
-# GLOBO TERRA
+# LAYER ISS
 # ----------------------
-sphere = go.Surface(
-    x=[[math.cos(u)*math.sin(v) for u in [i*0.1 for i in range(63)]] for v in [i*0.1 for i in range(63)]],
-    y=[[math.sin(u)*math.sin(v) for u in [i*0.1 for i in range(63)]] for v in [i*0.1 for i in range(63)]],
-    z=[[math.cos(v) for u in [i*0.1 for i in range(63)]] for v in [i*0.1 for i in range(63)]],
-    colorscale="Blues",
-    showscale=False,
-    opacity=0.6
+iss_layer = pdk.Layer(
+    "ScatterplotLayer",
+    data=[{"position": [lon, lat]}],
+    get_position="position",
+    get_color=[255, 0, 0],
+    get_radius=200000,
 )
 
 # ----------------------
-# ISS TRACK
+# TRAIETTORIA
 # ----------------------
-track_line = go.Scatter3d(
-    x=xs,
-    y=ys,
-    z=zs,
-    mode='lines',
-    line=dict(color='cyan', width=4),
-    name="Orbita"
+path_layer = pdk.Layer(
+    "PathLayer",
+    data=[{"path": st.session_state.track}],
+    get_path="path",
+    get_color=[0, 255, 255],
+    width_scale=20,
+    width_min_pixels=2,
 )
 
 # ----------------------
-# ISS PUNTO
+# VIEW
 # ----------------------
-iss_point = go.Scatter3d(
-    x=[x],
-    y=[y],
-    z=[z],
-    mode='markers',
-    marker=dict(size=6, color='red'),
-    name="ISS"
+view_state = pdk.ViewState(
+    latitude=lat,
+    longitude=lon,
+    zoom=2,
+    pitch=45,
 )
 
 # ----------------------
-# FIGURA
+# MAPPA (STILE NASA)
 # ----------------------
-fig = go.Figure(data=[sphere, track_line, iss_point])
-
-fig.update_layout(
-    scene=dict(
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        zaxis=dict(visible=False),
-        bgcolor="black"
-    ),
-    margin=dict(l=0, r=0, t=0, b=0)
+deck = pdk.Deck(
+    layers=[path_layer, iss_layer],
+    initial_view_state=view_state,
+    map_style="mapbox://styles/mapbox/dark-v10"
 )
 
-# ----------------------
-# OUTPUT
-# ----------------------
-st.plotly_chart(fig, use_container_width=True)
+st.pydeck_chart(deck)
 
 # ----------------------
-# DATI LIVE
+# TELEMETRIA
 # ----------------------
-st.subheader("📡 Telemetria")
+st.subheader("📡 Telemetria ISS")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
+
 col1.metric("Latitudine", f"{lat:.4f}")
 col2.metric("Longitudine", f"{lon:.4f}")
+col3.metric("Velocità km/h", f"{speed:.0f}")
+
+# ----------------------
+# INFO EXTRA
+# ----------------------
+st.markdown("---")
+st.caption(f"🕒 Aggiornamento: {datetime.now().strftime('%H:%M:%S')}")
