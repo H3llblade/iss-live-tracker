@@ -6,10 +6,18 @@ from timezonefinder import TimezoneFinder
 import pytz
 import folium
 from streamlit.components.v1 import html
+from streamlit_autorefresh import st_autorefresh
 
-st.set_page_config(layout="wide", page_title="NASA ISS Tracker - OSM")
-
+# ----------------------
+# CONFIG
+# ----------------------
+st.set_page_config(layout="wide", page_title="NASA ISS Tracker - OSM Fluido")
 st.title("🛰️ NASA ISS Tracker - OpenStreetMap")
+
+# ----------------------
+# AUTOREFRESH OGNI 30s
+# ----------------------
+st_autorefresh(interval=30*1000, key="refresh")
 
 # ----------------------
 # SESSION STATE
@@ -84,7 +92,7 @@ folium.CircleMarker(
     fill_color="orange",
 ).add_to(m)
 
-# Visualizza mappa su Streamlit
+# Visualizza mappa
 html(m._repr_html_(), height=500)
 
 # ----------------------
@@ -98,7 +106,7 @@ col3.metric("Velocità", f"{speed:.0f} km/h")
 col4.metric("Altitudine stimata", f"{altitude:.0f} km")
 
 # ----------------------
-# CITTÀ SORVOLATA
+# CITTÀ SORVOLATA E ORARIO LOCALE
 st.subheader("🏙️ Città sorvolata")
 city, tz_name, local_time = get_city_and_time(lat, lon)
 col_city, col_tz, col_time = st.columns(3)
