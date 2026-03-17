@@ -1,33 +1,56 @@
 import streamlit as st
 import requests
 import folium
-import time
 from streamlit_folium import st_folium
 from datetime import datetime
 import math
+import time
 
-# Config pagina
+# ----------------------
+# CONFIG PAGINA
+# ----------------------
 st.set_page_config(
-    page_title="ISS Tracker Live",
+    page_title="ISS Mission Control",
     layout="wide"
 )
 
-st.title("🛰️ ISS Live Tracker")
-st.markdown("Tracking in tempo reale della Stazione Spaziale Internazionale")
+# ----------------------
+# STILE DARK NASA
+# ----------------------
+st.markdown("""
+    <style>
+    body {
+        background-color: #0b0f1a;
+        color: white;
+    }
+    .stApp {
+        background-color: #0b0f1a;
+    }
+    h1, h2, h3, h4 {
+        color: #00e6ff;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
+# ----------------------
+# HEADER
+# ----------------------
+st.title("🛰️ ISS MISSION CONTROL")
+st.caption("Live tracking della Stazione Spaziale Internazionale")
+
+# ----------------------
+# API
+# ----------------------
 URL = "http://api.open-notify.org/iss-now.json"
 
-# Funzione per ottenere dati ISS
 def get_iss_position():
     response = requests.get(URL)
     data = response.json()
+    return float(data['iss_position']['latitude']), float(data['iss_position']['longitude'])
 
-    lat = float(data['iss_position']['latitude'])
-    lon = float(data['iss_position']['longitude'])
-
-    return lat, lon
-
-# Calcolo distanza (Haversine)
+# ----------------------
+# CALCOLO DISTANZA
+# ----------------------
 def distanza(lat1, lon1, lat2, lon2):
     R = 6371
     dlat = math.radians(lat2 - lat1)
@@ -38,79 +61,92 @@ def distanza(lat1, lon1, lat2, lon2):
 
     return R * c
 
-# Stato Italia
+# ----------------------
+# ITALIA CHECK
+# ----------------------
 def sopra_italia(lat, lon):
     return 36 < lat < 47 and 6 < lon < 19
 
-# Stato sessione
+# ----------------------
+# SESSION STATE
+# ----------------------
 if "percorso" not in st.session_state:
     st.session_state.percorso = []
 
 if "last_pos" not in st.session_state:
     st.session_state.last_pos = None
 
-# Aggiornamento automatico
-REFRESH_RATE = 30
-
-# Bottone manuale
-if st.button("🔄 Aggiorna ora"):
-    st.rerun()
-
-# Dati ISS
+# ----------------------
+# DATI
+# ----------------------
 lat, lon = get_iss_position()
 st.session_state.percorso.append([lat, lon])
 
-# Metriche
+# ----------------------
+# METRICHE
+# ----------------------
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Latitudine", f"{lat:.4f}")
-col2.metric("Longitudine", f"{lon:.4f}")
+col1.metric("🌍 Latitudine", f"{lat:.4f}")
+col2.metric("🌍 Longitudine", f"{lon:.4f}")
 
-# Velocità stimata
 velocita = 0
 if st.session_state.last_pos:
     lat1, lon1 = st.session_state.last_pos
     dist = distanza(lat1, lon1, lat, lon)
-    velocita = dist / (REFRESH_RATE / 3600)
+    velocita = dist / (30 / 3600)
 
-col3.metric("Velocità (km/h)", f"{velocita:.0f}")
+col3.metric("🚀 Velocità km/h", f"{velocita:.0f}")
 
-# Stato Italia
-stato = "🇮🇹 Sopra Italia" if sopra_italia(lat, lon) else "🌍 Altrove"
-col4.metric("Posizione", stato)
+stato = "🇮🇹 SOPRA ITALIA" if sopra_italia(lat, lon) else "🌌 IN ORBITA"
+col4.metric("📡 Stato", stato)
 
-# Salva ultima posizione
 st.session_state.last_pos = (lat, lon)
 
-# Mappa
-mappa = folium.Map(location=[lat, lon], zoom_start=3)
+# ----------------------
+# MAPPA DARK
+# ----------------------
+mappa = folium.Map(
+    location=[lat, lon],
+    zoom_start=3,
+    tiles="CartoDB dark_matter"
+)
 
-# Marker
-folium.Marker(
-    [lat, lon],
-    tooltip="ISS",
-    icon=folium.Icon(color="red")
+# Marker ISS
+folium.CircleMarker(
+    location=[lat, lon],
+    radius=8,
+    color="cyan",
+    fill=True,
+    fill_color="cyan"
 ).add_to(mappa)
 
 # Percorso
 if len(st.session_state.percorso) > 1:
     folium.PolyLine(
         st.session_state.percorso,
-        color="red",
+        color="cyan",
         weight=2
     ).add_to(mappa)
 
-st_folium(mappa, width=1000, height=500)
+st_folium(mappa, width=1200, height=500)
 
-# Timeline
-st.subheader("📍 Storico posizioni")
+# ----------------------
+# STORICO
+# ----------------------
+st.subheader("📍 Traiettoria recente")
 
 for i, pos in enumerate(st.session_state.percorso[-10:][::-1]):
-    st.write(f"{i+1}. {pos}")
+    st.write(f"{i+1}. Lat: {pos[0]:.4f}, Lon: {pos[1]:.4f}")
 
-# Timestamp
-st.caption(f"Ultimo aggiornamento: {datetime.now().strftime('%H:%M:%S')}")
+# ----------------------
+# FOOTER
+# ----------------------
+st.markdown("---")
+st.caption(f"🕒 Ultimo aggiornamento: {datetime.now().strftime('%H:%M:%S')}")
 
-# Auto-refresh
-time.sleep(REFRESH_RATE)
+# ----------------------
+# AUTO REFRESH
+# ----------------------
+time.sleep(30)
 st.rerun()
