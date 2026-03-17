@@ -84,7 +84,7 @@ iss_layer = pdk.Layer(
     data=[{"position": [lon, lat]}],
     get_position="position",
     get_color=[255, 215, 0],  # giallo brillante
-    get_radius=2500,  
+    get_radius=25000,  
     pickable=True,
 )
 
