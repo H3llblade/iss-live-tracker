@@ -7,29 +7,12 @@ from timezonefinder import TimezoneFinder
 import pytz
 import folium
 from streamlit_folium import st_folium
-from streamlit_autorefresh import st_autorefresh
 
 # ----------------------
 # CONFIG
 # ----------------------
 st.set_page_config(layout="wide", page_title="NASA ISS Tracker")
 st.title("🛰️ NASA ISS Tracker - Folium OpenStreetMap")
-
-# Refresh automatico ogni 10 secondi
-st_autorefresh(interval=10000, key="refresh")
-
-URL = "http://api.open-notify.org/iss-now.json"
-
-# ----------------------
-# LIGHT/DARK TOGGLE
-# ----------------------
-if "light_mode" not in st.session_state:
-    st.session_state.light_mode = True
-
-st.checkbox("🌕 Light Mode / 🌑 Dark Mode", value=st.session_state.light_mode,
-            key="light_mode", on_change=lambda: st.session_state.update({"light_mode": not st.session_state.light_mode}))
-
-tile_style = "OpenStreetMap" if st.session_state.light_mode else "CartoDB dark_matter"
 
 # ----------------------
 # SESSION STATE
@@ -44,11 +27,17 @@ if "altitude" not in st.session_state:
     st.session_state.altitude = 420
 
 # ----------------------
+# LIGHT/DARK SELEZIONE
+# ----------------------
+theme = st.selectbox("Seleziona tema mappa", ["Light", "Dark"])
+tile_style = "OpenStreetMap" if theme == "Light" else "CartoDB dark_matter"
+
+# ----------------------
 # FUNZIONI
 # ----------------------
 def get_iss():
     try:
-        data = requests.get(URL, timeout=5).json()
+        data = requests.get("http://api.open-notify.org/iss-now.json", timeout=5).json()
         lat = float(data['iss_position']['latitude'])
         lon = float(data['iss_position']['longitude'])
         return lat, lon
@@ -64,14 +53,14 @@ def distanza(lat1, lon1, lat2, lon2):
     return R * c
 
 def get_city_and_time(lat, lon):
-    """Restituisce città e ora locale corretta"""
+    """Restituisce città e ora locale corretta; gestisce oceano"""
     try:
         geolocator = Nominatim(user_agent="iss_tracker")
         location = geolocator.reverse((lat, lon), language="en", zoom=10)
-        city = location.raw.get('address', {}).get('city') \
-               or location.raw.get('address', {}).get('town') \
-               or location.raw.get('address', {}).get('village') \
-               or "Sconosciuta"
+        address = location.raw.get('address', {})
+        city = address.get('city') or address.get('town') or address.get('village')
+        if not city:
+            return "Over Ocean", "UTC", datetime.utcnow().strftime("%H:%M:%S")
         tf = TimezoneFinder()
         tz_name = tf.timezone_at(lat=lat, lng=lon)
         tz = pytz.timezone(tz_name) if tz_name else pytz.utc
@@ -104,7 +93,7 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# MAPPA FOLIUM
+# CREAZIONE MAPPA
 # ----------------------
 m = folium.Map(location=[lat, lon], zoom_start=2, tiles=tile_style)
 
@@ -121,8 +110,8 @@ folium.CircleMarker(
     fill_color="orange",
 ).add_to(m)
 
-# Visualizza la mappa su Streamlit
-st_data = st_folium(m, width=900, height=500)
+# Visualizza la mappa senza flash continuo
+st_folium(m, width=900, height=500)
 
 # ----------------------
 # TELEMETRIA ISS
