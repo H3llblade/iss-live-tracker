@@ -1,18 +1,18 @@
 import streamlit as st
 import requests
-import pydeck as pdk
-from streamlit_autorefresh import st_autorefresh
 import math
 from datetime import datetime
 from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 import pytz
+import folium
+from streamlit_folium import st_folium
 
 # ----------------------
 # CONFIG
 # ----------------------
 st.set_page_config(layout="wide", page_title="NASA ISS Tracker")
-st.title("🛰️ NASA ISS Tracker - OpenStreetMap")
+st.title("🛰️ NASA ISS Tracker - Folium OpenStreetMap")
 
 # Refresh automatico ogni 10 secondi
 st_autorefresh(interval=10000, key="refresh")
@@ -23,23 +23,24 @@ URL = "http://api.open-notify.org/iss-now.json"
 # LIGHT/DARK TOGGLE
 # ----------------------
 if "light_mode" not in st.session_state:
-    st.session_state.light_mode = False
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = True
+    st.session_state.light_mode = True
 
-def toggle_light():
-    st.session_state.dark_mode = not st.session_state.light_mode
+st.checkbox("🌕 Light Mode / 🌑 Dark Mode", value=st.session_state.light_mode,
+            key="light_mode", on_change=lambda: st.session_state.update({"light_mode": not st.session_state.light_mode}))
 
-def toggle_dark():
-    st.session_state.light_mode = not st.session_state.dark_mode
+tile_style = "OpenStreetMap" if st.session_state.light_mode else "CartoDB dark_matter"
 
-col1, col2 = st.columns(2)
-with col1:
-    st.checkbox("🌕 Light Mode", value=st.session_state.light_mode, key="light_mode", on_change=toggle_light)
-with col2:
-    st.checkbox("🌑 Dark Mode", value=st.session_state.dark_mode, key="dark_mode", on_change=toggle_dark)
+# ----------------------
+# SESSION STATE
+# ----------------------
+if "track" not in st.session_state:
+    st.session_state.track = []
 
-map_style = "light" if st.session_state.light_mode else "dark"
+if "last" not in st.session_state:
+    st.session_state.last = None
+
+if "altitude" not in st.session_state:
+    st.session_state.altitude = 420
 
 # ----------------------
 # FUNZIONI
@@ -79,21 +80,6 @@ def get_city_and_time(lat, lon):
         return "Sconosciuta", "UTC", datetime.utcnow().strftime("%H:%M:%S")
 
 # ----------------------
-# SESSION STATE
-# ----------------------
-if "track" not in st.session_state:
-    st.session_state.track = []
-
-if "last" not in st.session_state:
-    st.session_state.last = None
-
-if "altitude" not in st.session_state:
-    st.session_state.altitude = 420
-
-if "bearing" not in st.session_state:
-    st.session_state.bearing = 0
-
-# ----------------------
 # DATI ISS
 # ----------------------
 lat, lon = get_iss()
@@ -101,7 +87,7 @@ if lat is None:
     st.error("Impossibile ottenere i dati ISS")
     st.stop()
 
-st.session_state.track.append([lon, lat])
+st.session_state.track.append([lat, lon])
 if len(st.session_state.track) > 300:
     st.session_state.track.pop(0)
 
@@ -117,54 +103,25 @@ if st.session_state.last:
 st.session_state.last = (lat, lon)
 
 # ----------------------
-# ROTAZIONE SIMULATA
+# MAPPA FOLIUM
 # ----------------------
-st.session_state.bearing += 3  # aumenta 3 gradi ogni refresh
+m = folium.Map(location=[lat, lon], zoom_start=2, tiles=tile_style)
 
-# ----------------------
-# LAYER ISS (pallino arancione)
-# ----------------------
-iss_layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=[{"position": [lon, lat]}],
-    get_position="position",
-    get_color=[255, 165, 0],
-    get_radius=25000,
-    pickable=True,
-)
+# Traiettoria
+if len(st.session_state.track) > 1:
+    folium.PolyLine(st.session_state.track, color="cyan", weight=2.5, opacity=0.8).add_to(m)
 
-# ----------------------
-# TRAIETTORIA
-# ----------------------
-path_layer = pdk.Layer(
-    "PathLayer",
-    data=[{"path": st.session_state.track}],
-    get_path="path",
-    get_color=[0, 255, 255],
-    width_scale=20,
-    width_min_pixels=2,
-)
+# ISS come pallino arancione
+folium.CircleMarker(
+    location=[lat, lon],
+    radius=8,
+    color="orange",
+    fill=True,
+    fill_color="orange",
+).add_to(m)
 
-# ----------------------
-# MAPPA OPENSTREETMAP
-# ----------------------
-view_state = pdk.ViewState(
-    latitude=lat,
-    longitude=lon,
-    zoom=2,
-    pitch=50,
-    bearing=st.session_state.bearing,
-)
-
-deck = pdk.Deck(
-    layers=[path_layer, iss_layer],
-    initial_view_state=view_state,
-    map_style="https://basemaps.cartocdn.com/gl/dark_all/{z}/{x}/{y}{r}.png" if map_style=="dark"
-               else "https://basemaps.cartocdn.com/gl/positron/{z}/{x}/{y}{r}.png",
-    tooltip={"text": "ISS Position\nLat: {lat}\nLon: {lon}"}
-)
-
-st.pydeck_chart(deck)
+# Visualizza la mappa su Streamlit
+st_data = st_folium(m, width=900, height=500)
 
 # ----------------------
 # TELEMETRIA ISS
